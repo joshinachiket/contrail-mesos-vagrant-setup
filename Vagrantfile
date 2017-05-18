@@ -3,7 +3,7 @@
 
 num_of_slaves = 1
 prefix_ip_addr = "174.24.197."
-tag_version = 3055
+tag_version = 3072
 stable_contrail_ansible_sha = "5587115e2bb551fde745f441c4276494fa0ed57c"
 
 Vagrant.configure("2") do |config|
@@ -17,14 +17,21 @@ Vagrant.configure("2") do |config|
     controller_ip = "%s101" % [prefix_ip_addr]
     slaves_ip = "%s102" % [prefix_ip_addr]
     slaves_ip_string = ""
-    num_of_slaves.times do |num|
-        slaves_ip_string.concat("#{prefix_ip_addr}#{102+num}\\\n")
+    cntr = 1
+    until cntr > (num_of_slaves - 1)  do
+        slaves_ip_string.concat("#{prefix_ip_addr}#{101+cntr}\\\n")
+        cntr = cntr + 1
     end
+    slaves_ip_string.concat("#{prefix_ip_addr}#{101+num_of_slaves}")
 
     # Setup controller
     config.vm.define :controller do |controller|
         controller.vm.hostname = "controller"
         controller.vm.network :private_network, ip: controller_ip
+        controller.vm.provider "virtualbox" do |v|
+            v.memory = 1024 * 16
+            v.cpus = 8
+        end
         controller.vm.provision 'shell', :inline => <<EOF
             # Setup passless access
             mkdir -p /root/.ssh
@@ -36,6 +43,10 @@ EOF
     config.vm.define :slave do |slave|
         slave.vm.hostname = "slave"
         slave.vm.network :private_network, ip: slaves_ip
+        slave.vm.provider "virtualbox" do |v|
+            v.memory = 1024 * 16
+            v.cpus = 8
+        end
         slave.vm.provision 'shell', :inline => <<EOF
             # Setup passless access
             mkdir -p /root/.ssh
@@ -49,6 +60,10 @@ EOF
     config.vm.define :builder do |builder|
         builder.vm.hostname = "builder"
         builder.vm.network :private_network, ip: builder_ip
+        builder.vm.provider "virtualbox" do |v|
+            v.memory = 1024 * 16
+            v.cpus = 8
+        end
         # Setup a contrail ansible repo
         builder.vm.provision :shell, inline: "sudo yum install git -y"
 
@@ -58,10 +73,10 @@ EOF
             git reset --hard #{stable_contrail_ansible_sha}
 
             # Copy inventory file
-            cp /vagrant/my-inventory.mesos /home/vagrant/contrail-ansible/playbooks/inventory/my-inventory.mesos
-            sed -i $'s/10.10.10.10/#{controller_ip}/g' /home/vagrant/contrail-ansible/playbooks/inventory/my-inventory.mesos
-            sed -i $'s/20.20.20.20/#{slaves_ip_string}/g' /home/vagrant/contrail-ansible/playbooks/inventory/my-inventory.mesos
-            sed -i $'s/3054/#{tag_version}/g' /home/vagrant/contrail-ansible/playbooks/inventory/my-inventory.mesos
+            cp /vagrant/my-inventory.new /home/vagrant/contrail-ansible/playbooks/inventory/my-inventory.new
+            sed -i $'s/10.10.10.10/#{controller_ip}/g' /home/vagrant/contrail-ansible/playbooks/inventory/my-inventory.new
+            sed -i $'s/20.20.20.20/#{slaves_ip_string}/g' /home/vagrant/contrail-ansible/playbooks/inventory/my-inventory.new
+            sed -i $'s/3054/#{tag_version}/g' /home/vagrant/contrail-ansible/playbooks/inventory/my-inventory.new
 
             # Setup ansible environment
             cp /vagrant/get-pip.py /home/vagrant/get-pip.py
@@ -82,7 +97,8 @@ EOF
             echo "  StrictHostKeyChecking no" >> /root/.ssh/config
             chmod 400 /root/.ssh/config
             cd /home/vagrant/contrail-ansible/playbooks
-            ansible-playbook -vvv -i inventory/my-inventory.mesos site.yml
+            git pull
+            ansible-playbook -vvv -i inventory/my-inventory.new site.yml
 EOF
     end
 end
