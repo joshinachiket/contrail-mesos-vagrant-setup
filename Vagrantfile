@@ -3,7 +3,7 @@
 
 num_of_slaves = 1
 prefix_ip_addr = "174.24.197."
-tag_version = 3072
+tag_version = 3068
 stable_contrail_ansible_sha = "5587115e2bb551fde745f441c4276494fa0ed57c"
 
 Vagrant.configure("2") do |config|
@@ -31,6 +31,8 @@ Vagrant.configure("2") do |config|
         controller.vm.provider "virtualbox" do |v|
             v.memory = 1024 * 16
             v.cpus = 8
+            v.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
+            v.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
         end
         controller.vm.provision 'shell', :inline => <<EOF
             # Setup passless access
@@ -46,6 +48,8 @@ EOF
         slave.vm.provider "virtualbox" do |v|
             v.memory = 1024 * 16
             v.cpus = 8
+            v.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
+            v.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
         end
         slave.vm.provision 'shell', :inline => <<EOF
             # Setup passless access
@@ -63,6 +67,8 @@ EOF
         builder.vm.provider "virtualbox" do |v|
             v.memory = 1024 * 16
             v.cpus = 8
+            v.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
+            v.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
         end
         # Setup a contrail ansible repo
         builder.vm.provision :shell, inline: "sudo yum install git -y"
@@ -73,10 +79,10 @@ EOF
             git reset --hard #{stable_contrail_ansible_sha}
 
             # Copy inventory file
-            cp /vagrant/my-inventory.new /home/vagrant/contrail-ansible/playbooks/inventory/my-inventory.new
-            sed -i $'s/10.10.10.10/#{controller_ip}/g' /home/vagrant/contrail-ansible/playbooks/inventory/my-inventory.new
-            sed -i $'s/20.20.20.20/#{slaves_ip_string}/g' /home/vagrant/contrail-ansible/playbooks/inventory/my-inventory.new
-            sed -i $'s/3054/#{tag_version}/g' /home/vagrant/contrail-ansible/playbooks/inventory/my-inventory.new
+            cp /vagrant/my-inventory.mesos /home/vagrant/contrail-ansible/playbooks/inventory/my-inventory.mesos
+            sed -i $'s/10.10.10.10/#{controller_ip}/g' /home/vagrant/contrail-ansible/playbooks/inventory/my-inventory.mesos
+            sed -i $'s/20.20.20.20/#{slaves_ip_string}/g' /home/vagrant/contrail-ansible/playbooks/inventory/my-inventory.mesos
+            sed -i $'s/3054/#{tag_version}/g' /home/vagrant/contrail-ansible/playbooks/inventory/my-inventory.mesos
 
             # Setup ansible environment
             cp /vagrant/get-pip.py /home/vagrant/get-pip.py
@@ -98,7 +104,7 @@ EOF
             chmod 400 /root/.ssh/config
             cd /home/vagrant/contrail-ansible/playbooks
             git pull
-            ansible-playbook -vvv -i inventory/my-inventory.new site.yml
+            time ansible-playbook -vvv -i inventory/my-inventory.mesos site.yml
 EOF
     end
 end
