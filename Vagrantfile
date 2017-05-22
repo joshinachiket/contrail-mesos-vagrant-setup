@@ -2,9 +2,11 @@
 # vi: set ft=ruby :
 
 num_of_slaves = 1
-prefix_ip_addr = "174.24.197."
-tag_version = 3068
-stable_contrail_ansible_sha = "5587115e2bb551fde745f441c4276494fa0ed57c"
+prefix_ip_addr = "174.10.100."
+tag_version = 6
+stable_contrail_ansible_sha = "47a025d8bbef129baf4455fe69ad8cc5d8ceb2eb"
+mesos_github_username = "username"
+mesos_github_password = "password"
 
 Vagrant.configure("2") do |config|
     config.vm.box = "centos/7"
@@ -28,16 +30,22 @@ Vagrant.configure("2") do |config|
     config.vm.define :controller do |controller|
         controller.vm.hostname = "controller"
         controller.vm.network :private_network, ip: controller_ip
+        #controller.vm.synced_folder "controller/", "/home/vagrant/sync"
         controller.vm.provider "virtualbox" do |v|
             v.memory = 1024 * 16
             v.cpus = 8
             v.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
             v.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
         end
+        controller.vm.network "forwarded_port", guest: 80, host: 80
+        controller.vm.network "forwarded_port", guest: 8080, host: 8080
+        controller.vm.network "forwarded_port", guest: 8082, host: 8082
+        controller.vm.network "forwarded_port", guest: 8085, host: 8085
+        controller.vm.network "forwarded_port", guest: 8143, host: 8143
         controller.vm.provision 'shell', :inline => <<EOF
-            # Setup passless access
-            mkdir -p /root/.ssh
-            cat /vagrant/id_rsa.pub >> /root/.ssh/authorized_keys
+        # Setup passless access
+        mkdir -p /root/.ssh
+        cat /vagrant/controller/id_rsa.pub >> /root/.ssh/authorized_keys
 EOF
     end
 
@@ -45,18 +53,23 @@ EOF
     config.vm.define :slave do |slave|
         slave.vm.hostname = "slave"
         slave.vm.network :private_network, ip: slaves_ip
+        #slave.vm.synced_folder "slave/", "/home/vagrant/sync"
         slave.vm.provider "virtualbox" do |v|
             v.memory = 1024 * 16
             v.cpus = 8
             v.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
             v.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
         end
+        slave.vm.network "forwarded_port", guest: 8880, host: 8880
+        slave.vm.network "forwarded_port", guest: 8881, host: 8881
+        slave.vm.network "forwarded_port", guest: 8882, host: 8882
         slave.vm.provision 'shell', :inline => <<EOF
-            # Setup passless access
-            mkdir -p /root/.ssh
-            cat /vagrant/id_rsa.pub >> /root/.ssh/authorized_keys
-            yum upgrade -y
-            yum install kernel-headers kernel-devel -y
+ 
+        # Setup passless access
+        mkdir -p /root/.ssh
+        cat /vagrant/slaves/id_rsa.pub >> /root/.ssh/authorized_keys
+        yum upgrade -y
+        yum install kernel-headers kernel-devel -y
 EOF
     end
 
@@ -64,6 +77,7 @@ EOF
     config.vm.define :builder do |builder|
         builder.vm.hostname = "builder"
         builder.vm.network :private_network, ip: builder_ip
+        #builder.vm.synced_folder "builder_sync/", "/home/vagrant/sync"
         builder.vm.provider "virtualbox" do |v|
             v.memory = 1024 * 16
             v.cpus = 8
@@ -79,13 +93,13 @@ EOF
             git reset --hard #{stable_contrail_ansible_sha}
 
             # Copy inventory file
-            cp /vagrant/my-inventory.mesos /home/vagrant/contrail-ansible/playbooks/inventory/my-inventory.mesos
-            sed -i $'s/10.10.10.10/#{controller_ip}/g' /home/vagrant/contrail-ansible/playbooks/inventory/my-inventory.mesos
-            sed -i $'s/20.20.20.20/#{slaves_ip_string}/g' /home/vagrant/contrail-ansible/playbooks/inventory/my-inventory.mesos
-            sed -i $'s/3054/#{tag_version}/g' /home/vagrant/contrail-ansible/playbooks/inventory/my-inventory.mesos
+            cp /vagrant/builder/contrail-inventory.ini /home/vagrant/contrail-ansible/playbooks/inventory/contrail-inventory.ini
+            sed -i $'s/10.10.10.10/#{controller_ip}/g' /home/vagrant/contrail-ansible/playbooks/inventory/contrail-inventory.ini
+            sed -i $'s/20.20.20.20/#{slaves_ip_string}/g' /home/vagrant/contrail-ansible/playbooks/inventory/contrail-inventory.ini
+            sed -i $'s/3054/#{tag_version}/g' /home/vagrant/contrail-ansible/playbooks/inventory/contrail-inventory.ini
 
             # Setup ansible environment
-            cp /vagrant/get-pip.py /home/vagrant/get-pip.py
+            cp /vagrant/builder/get-pip.py /home/vagrant/get-pip.py
             sudo python /home/vagrant/get-pip.py
             sudo pip install Jinja2==2.8.1
             sudo yum install gcc -y
@@ -95,16 +109,20 @@ EOF
 
             # Setup passless access
             mkdir -p ~/.ssh
-            cp /vagrant/id_rsa /root/.ssh/id_rsa
-            cp /vagrant/id_rsa.pub /root/.ssh/id_rsa.pub
+            cp /vagrant/builder/id_rsa /root/.ssh/id_rsa
+            cp /vagrant/builder/id_rsa.pub /root/.ssh/id_rsa.pub
 
             # Run ansible
             echo "Host *" > /root/.ssh/config
             echo "  StrictHostKeyChecking no" >> /root/.ssh/config
             chmod 400 /root/.ssh/config
             cd /home/vagrant/contrail-ansible/playbooks
-            git pull
-            time ansible-playbook -vvv -i inventory/my-inventory.mesos site.yml
+            cp -r /vagrant/builder/container_images .
+            cp /vagrant/builder/patch.diff /home/vagrant/contrail-ansible/playbooks/patch.diff
+            #git pull
+            yum install patch -y
+            patch -p2 < patch.diff
+            time ansible-playbook -vvv -i inventory/contrail-inventory.ini site.yml
 EOF
     end
 end

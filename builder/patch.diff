@@ -1,0 +1,29 @@
+diff --git a/playbooks/roles/node/vars/main.yml b/playbooks/roles/node/vars/main.yml
+index 191e43b..10b82a5 100644
+--- a/playbooks/roles/node/vars/main.yml
++++ b/playbooks/roles/node/vars/main.yml
+@@ -43,9 +43,6 @@ ceph_controller_config: "{{ ceph_config | default({}) |                        \
+                               'enable_stats_daemon': enable_stats_daemon       \
+                             }) }}"
+
+-kernel_upgrade: "{{ kernel_upgrade | default('False') }}"
+-default_kernel_version: "{{ '4.4.0-38' if ansible_distribution + ansible_distribution_version == 'Ubuntu16.04' else '3.13.0-106' }}"
+-kernel_version: "{{ kernel_version | default(default_kernel_version) }}"
+ controller_group: "{{ groups['contrail-controllers'] | default([]) }}"
+ analytics_group: "{{ groups['contrail-analytics'] | default([]) }}"
+ analyticsdb_group: "{{ groups['contrail-analyticsdb'] | default([]) }}"
+diff --git a/playbooks/site.yml b/playbooks/site.yml
+index 74dffb6..54451b4 100644
+--- a/playbooks/site.yml
++++ b/playbooks/site.yml
+@@ -29,10 +29,6 @@
+       when:
+         - deployment_platform == "docker" and docker_required == true
+         - "'kubernetes-contrail-controllers' not in group_names"
+-    - name: Upgrade kernel to the version supplied with this image
+-      role: contrail/upgrade_kernel
+-      tags: [contrail.upgrade_kernel]
+-      when: kernel_upgrade
+     - name: Setup the containers
+       role: node
+       tags: [node]
