@@ -124,5 +124,16 @@ EOF
             patch -p2 < patch.diff
             time ansible-playbook -vvv -i inventory/contrail-inventory.ini site.yml
 EOF
+
+        # Setup a contrail mesos ansible repo
+        builder.vm.provision 'shell', :inline => <<EOF
+            git clone https://#{mesos_github_username}:#{mesos_github_password}@github.com/Juniper/contrail-mesos-ansible.git
+
+            # Copy inventory file
+            cp /vagrant/builder/mesos-inventory.ini /home/vagrant/contrail-mesos-ansible/playbooks/inventory/mesos-inventory.ini
+            sed -i $'s/20.20.20.20/#{slaves_ip_string}/g' /home/vagrant/contrail-mesos-ansible/playbooks/inventory/mesos-inventory.ini
+            cd /home/vagrant/contrail-mesos-ansible/playbooks
+            time ansible-playbook -vvv -i inventory/mesos-inventory.ini all.yml
+EOF
     end
 end
