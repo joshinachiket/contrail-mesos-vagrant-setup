@@ -70,6 +70,8 @@ EOF
         cat /vagrant/slaves/id_rsa.pub >> /root/.ssh/authorized_keys
         yum upgrade -y
         yum install kernel-headers kernel-devel -y
+        pip install pyroute2==0.4.13
+        ip route add 8.8.8.8 via 174.10.100.102 dev vhost0
 EOF
     end
 
@@ -134,6 +136,10 @@ EOF
             sed -i $'s/20.20.20.20/#{slaves_ip_string}/g' /home/vagrant/contrail-mesos-ansible/playbooks/inventory/mesos-inventory.ini
             cd /home/vagrant/contrail-mesos-ansible/playbooks
             time ansible-playbook -vvv -i inventory/mesos-inventory.ini all.yml
+
+            # Configuring ling local
+        builder.vm.provision 'shell', :inline => <<EOF
+            ssh root@#{controller_ip} 'docker exec -it controller /opt/contrail/utils/provision_linklocal.py --api_server_ip 174.10.100.101 --linklocal_service_name mesos --linklocal_service_ip 169.254.169.1 --linklocal_service_port 8882 --ipfabric_service_ip 127.0.0.1 --ipfabric_service_port 8882'
 EOF
     end
 end

@@ -1,3 +1,16 @@
+diff --git a/playbooks/roles/node/tasks/kube_cni.yml b/playbooks/roles/node/tasks/kube_cni.yml
+index 5f988f6..ad1f489 100644
+--- a/playbooks/roles/node/tasks/kube_cni.yml
++++ b/playbooks/roles/node/tasks/kube_cni.yml
+@@ -1,7 +1,7 @@
+ ---
+ - name: Install contrail cni package
+   package: name="{{ contrail_cni_package_name }}" state=present
+-  when: nested_mode
++  when: nested_mode or cloud_orchestrator == 'mesos'
+
+ - name: Make sure cni directories exist
+   file: path="{{ item }}" state=directory recurse=true
 diff --git a/playbooks/roles/node/vars/main.yml b/playbooks/roles/node/vars/main.yml
 index 191e43b..10b82a5 100644
 --- a/playbooks/roles/node/vars/main.yml
@@ -27,3 +40,4 @@ index 74dffb6..54451b4 100644
      - name: Setup the containers
        role: node
        tags: [node]
+
