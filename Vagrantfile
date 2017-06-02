@@ -5,8 +5,8 @@ num_of_slaves = 1
 prefix_ip_addr = "174.10.100."
 tag_version = 6
 stable_contrail_ansible_sha = "47a025d8bbef129baf4455fe69ad8cc5d8ceb2eb"
-mesos_github_username = "username"
-mesos_github_password = "password"
+#mesos_github_username = "username"
+#mesos_github_password = "password"
 
 Vagrant.configure("2") do |config|
     config.vm.box = "centos/7"
@@ -73,7 +73,6 @@ EOF
         cp /vagrant/builder/get-pip.py /home/vagrant/get-pip.py
         sudo python /home/vagrant/get-pip.py
         pip install pyroute2==0.4.13
-        #ip route add 8.8.8.8 via 174.10.100.102 dev vhost0
         yum install net-tools -y
 EOF
     end
@@ -141,9 +140,14 @@ EOF
             time ansible-playbook -vvv -i inventory/mesos-inventory.ini all.yml
 EOF
 
-        # Configuring link local
         builder.vm.provision 'shell', :inline => <<EOF
+        # Configuring link local
             ssh root@#{controller_ip} 'docker exec -i controller /opt/contrail/utils/provision_linklocal.py --api_server_ip 174.10.100.101 --linklocal_service_name mesos --linklocal_service_ip 169.254.169.1 --linklocal_service_port 8882 --ipfabric_service_ip 127.0.0.1 --ipfabric_service_port 8882'
+
+        #Setting route for 8.8.8.8 so that mesos will pick related ip
+        ssh root@{slaves_ip} 'ip route add 8.8.8.8 via 174.10.100.102 dev vhost0; sed -i $"s/[0-9]\{1,3\}.[0-9]\{1,3\}.[0-9]\{1,3\}.[0-9]\{1,3\}/#{slaves_ip}/g" >> /etc/default/mesos'
+        ssh root@{slaves_ip} 'service zookeeper restart; service mesos-master restart; rm -f /var/mesos/meta/slaves/latest; service mesos-slave restart; service marathon restart'
+
 EOF
     end
 end
