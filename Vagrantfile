@@ -1,15 +1,26 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
-num_of_slaves = 1
-prefix_ip_addr = "174.10.100."
-tag_version = 6
-stable_contrail_ansible_sha = "47a025d8bbef129baf4455fe69ad8cc5d8ceb2eb"
-#mesos_github_username = "username"
-#mesos_github_password = "password"
+require 'yaml'
+# read yaml given from command line
+input_yaml = ENV['CONFIG']
+config = YAML.load_file(input_yaml)
+num_of_slaves = config['num_of_slaves']
+prefix_ip_addr = config['prefix_ip_addr']
+tag_version = config['tag_version']
+stable_contrail_ansible_sha = config['stable_contrail_ansible_sha']
+VAGRANTFILE_API_VERSION = config['VAGRANTFILE_API_VERSION']
+box = config['box']
+cntr = config['cntr']
+memory = config['memory']
+cpus = config['cpus']
+controller_name = config['controller_hostname']
+builder_name = config['builder_hostname']
+slave_name = config['slave_hostname']
+provider = config['provider']
 
-Vagrant.configure("2") do |config|
-    config.vm.box = "centos/7"
+Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
+    config.vm.box = box
 
     # Sync fix. deatils(https://seven.centos.org/2017/05/updated-centos-vagrant-images-available-v1704-01/)
     config.vm.synced_folder ".", "/home/vagrant/sync", disabled: true
@@ -28,10 +39,10 @@ Vagrant.configure("2") do |config|
 
     # Setup controller
     config.vm.define :controller do |controller|
-        controller.vm.hostname = "controller"
+        controller.vm.hostname = controller_name
         controller.vm.network :private_network, ip: controller_ip
         #controller.vm.synced_folder "controller/", "/home/vagrant/sync"
-        controller.vm.provider "virtualbox" do |v|
+        controller.vm.provider provider do |v|
             v.memory = 1024 * 16
             v.cpus = 8
             v.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
@@ -51,10 +62,10 @@ EOF
 
     # Setup slaves
     config.vm.define :slave do |slave|
-        slave.vm.hostname = "slave"
+        slave.vm.hostname = slave_name
         slave.vm.network :private_network, ip: slaves_ip
         #slave.vm.synced_folder "slave/", "/home/vagrant/sync"
-        slave.vm.provider "virtualbox" do |v|
+        slave.vm.provider provider do |v|
             v.memory = 1024 * 16
             v.cpus = 8
             v.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
@@ -79,10 +90,10 @@ EOF
 
     # Setup builder
     config.vm.define :builder do |builder|
-        builder.vm.hostname = "builder"
+        builder.vm.hostname = builder_name
         builder.vm.network :private_network, ip: builder_ip
         #builder.vm.synced_folder "builder_sync/", "/home/vagrant/sync"
-        builder.vm.provider "virtualbox" do |v|
+        builder.vm.provider provider do |v|
             v.memory = 1024 * 16
             v.cpus = 8
             v.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
@@ -129,24 +140,5 @@ EOF
             time ansible-playbook -vvv -i inventory/contrail-inventory.ini site.yml
 EOF
 
-        # Setup a contrail mesos ansible repo
-        builder.vm.provision 'shell', :inline => <<EOF
-            git clone https://#{mesos_github_username}:#{mesos_github_password}@github.com/Juniper/contrail-mesos-ansible.git
-
-            # Copy inventory file
-            cp /vagrant/builder/mesos-inventory.ini /home/vagrant/contrail-mesos-ansible/playbooks/inventory/mesos-inventory.ini
-            sed -i $'s/20.20.20.20/#{slaves_ip_string}/g' /home/vagrant/contrail-mesos-ansible/playbooks/inventory/mesos-inventory.ini
-            cd /home/vagrant/contrail-mesos-ansible/playbooks
-            time ansible-playbook -vvv -i inventory/mesos-inventory.ini all.yml
-EOF
-
-        builder.vm.provision 'shell', :inline => <<EOF
-        # Configuring link local
-            ssh root@#{controller_ip} 'docker exec -i controller /opt/contrail/utils/provision_linklocal.py --api_server_ip #{controller_ip} --linklocal_service_name mesos --linklocal_service_ip 169.254.169.1 --linklocal_service_port 8882 --ipfabric_service_ip 127.0.0.1 --ipfabric_service_port 8882'
-
-        #Setting route for 8.8.8.8 so that mesos will pick related ip
-        cp /vagrant/slave/change_ip.sh /home/vagrant/change_ip.sh
-        ssh root@#{slaves_ip} 'sh /home/vagrant/change_ip.sh'
-EOF
     end
 end
