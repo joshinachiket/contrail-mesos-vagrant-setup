@@ -1,15 +1,19 @@
 ---
-num_of_slaves: 1
-prefix_ip_addr: 174.10.100.
-tag_version: 6
-stable_contrail_ansible_sha: 47a025d8bbef129baf4455fe69ad8cc5d8ceb2eb
-memory: 16384
-cpus: 8
-network: private_network
-controller_hostname: controller
-builder_hostname: builder
-slave_hostname: slave
-VAGRANTFILE_API_VERSION: 2
-box: centos/7
-cntr: 1
-provider: virtualbox
+vms:
+  num_of_slaves: 2
+  prefix_ip_addr: 173.10.100.
+  tag_version: 6
+  stable_contrail_ansible_sha: 47a025d8bbef129baf4455fe69ad8cc5d8ceb2eb
+  box: centos/7
+  #use your server IP address and marathon port in url
+  url: http://10.84.23.35:9990/v2/apps/
+mesos:
+  include: true
+port:
+  http: 80
+  contrail: 8080
+  contrail_json: 8082
+  contrail_introspect: 8083
+  contrail_http: 8143
+  marathon: 8880
+  mesos_master: 8881
